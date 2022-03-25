@@ -2,7 +2,7 @@ require('./sourcemap-register.js');(()=>{var e={7351:function(e,t,r){"use strict
 /*!
  * Tmp
  *
- * Copyright (c) 2011-2017 KARASZI Istvan <github@spam.raszi.hu>
+ * Copyright (c) 2011-2022
  *
  * MIT Licensed
  */
