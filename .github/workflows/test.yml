@@ -1,0 +1,37 @@
+name: test
+
+on:
+  push:
+    branches:
+      - 'master'
+      - 'releases/v*'
+  pull_request:
+    branches:
+      - 'master'
+      - 'releases/v*'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v3
+      -
+        name: Validate
+        uses: docker/bake-action@v1
+        with:
+          targets: validate
+      -
+        name: Set up Docker Buildx
+        uses: ./
+      -
+        name: Test
+        uses: docker/bake-action@v1
+        with:
+          targets: test
+      -
+        name: Upload coverage
+        uses: codecov/codecov-action@v2
+        with:
+          file: ./coverage/clover.xml
