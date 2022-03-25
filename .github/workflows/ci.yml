@@ -1,0 +1,373 @@
+name: ci
+
+on:
+  schedule:
+    - cron: '0 10 * * *' # everyday at 10am
+  push:
+    branches:
+      - 'master'
+      - 'releases/v*'
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - 'master'
+      - 'releases/v*'
+
+jobs:
+  main:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        buildx-version:
+          - latest
+          - v0.4.1
+          - ""
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v3
+      -
+        name: Set up Docker Buildx
+        id: buildx
+        uses: ./
+        with:
+          version: ${{ matrix.buildx-version }}
+      -
+        name: Inspect builder
+        run: |
+          echo "Name:      ${{ steps.buildx.outputs.name }}"
+          echo "Endpoint:  ${{ steps.buildx.outputs.endpoint }}"
+          echo "Status:    ${{ steps.buildx.outputs.status }}"
+          echo "Flags:     ${{ steps.buildx.outputs.flags }}"
+          echo "Platforms: ${{ steps.buildx.outputs.platforms }}"
+      -
+        name: Dump context
+        uses: crazy-max/ghaction-dump-context@v1
+
+  multi:
+    runs-on: ubuntu-latest
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v3
+      -
+        name: Set up Docker Buildx 1
+        id: buildx1
+        uses: ./
+      -
+        name: Inspect builder 1
+        run: |
+          echo "Name:      ${{ steps.buildx1.outputs.name }}"
+          echo "Endpoint:  ${{ steps.buildx1.outputs.endpoint }}"
+          echo "Status:    ${{ steps.buildx1.outputs.status }}"
+          echo "Flags:     ${{ steps.buildx1.outputs.flags }}"
+          echo "Platforms: ${{ steps.buildx1.outputs.platforms }}"
+      -
+        name: Set up Docker Buildx 2
+        id: buildx2
+        uses: ./
+      -
+        name: Inspect builder 2
+        run: |
+          echo "Name:      ${{ steps.buildx2.outputs.name }}"
+          echo "Endpoint:  ${{ steps.buildx2.outputs.endpoint }}"
+          echo "Status:    ${{ steps.buildx2.outputs.status }}"
+          echo "Flags:     ${{ steps.buildx2.outputs.flags }}"
+          echo "Platforms: ${{ steps.buildx2.outputs.platforms }}"
+  error:
+    runs-on: ubuntu-latest
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v3
+      -
+        name: Stop docker
+        run: |
+          sudo systemctl stop docker
+      -
+        name: Set up Docker Buildx
+        id: buildx
+        continue-on-error: true
+        uses: ./
+      -
+        name: Check
+        run: |
+          echo "${{ toJson(steps.buildx) }}"
+          if [ "${{ steps.buildx.outcome }}" != "failure" ] || [ "${{ steps.buildx.conclusion }}" != "success" ]; then
+            echo "::error::Should have failed"
+            exit 1
+          fi
+      -
+        name: Dump context
+        if: always()
+        uses: crazy-max/ghaction-dump-context@v1
+
+  debug:
+    runs-on: ubuntu-latest
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v3
+      -
+        name: Create Dockerfile
+        run: |
+          cat > ./Dockerfile <<EOL
+          FROM alpine
+          RUN uname -a
+          EOL
+      -
+        name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+      -
+        name: Set up Docker Buildx
+        uses: ./
+        with:
+          buildkitd-flags: --debug
+      -
+        name: Build
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64,linux/ppc64le
+
+  install:
+    runs-on: ubuntu-latest
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v3
+      -
+        name: Set up Docker Buildx
+        uses: ./
+        with:
+          install: true
+      -
+        name: Check cmd
+        run: |
+          docker build --help
+  use:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        use:
+          - true
+          - false
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v3
+      -
+        name: Set up Docker Buildx
+        uses: ./
+        with:
+          use: ${{ matrix.use }}
+      -
+        name: List builder instances
+        run: docker buildx ls
+
+  driver:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        driver-opts:
+          - image=moby/buildkit:latest
+          - |
+            image=moby/buildkit:master
+            network=host
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v3
+      -
+        name: Set up Docker Buildx
+        uses: ./
+        with:
+          driver: docker-container
+          driver-opts: ${{ matrix.driver-opts }}
+
+  docker-driver:
+    runs-on: ubuntu-latest
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v3
+      -
+        name: Set up Docker Buildx
+        uses: ./
+        id: builder
+        with:
+          driver: docker
+      -
+        name: Verify
+        run: |
+          [[ "${{ steps.builder.outputs.name }}" = "default" ]]
+          docker buildx inspect
+          docker buildx inspect | grep Driver | grep docker
+          docker buildx inspect | grep Status | grep running
+  endpoint:
+    runs-on: ubuntu-latest
+    services:
+      dind:
+        image: docker:dind
+        options: >-
+          --privileged
+          --health-cmd "docker info"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        env:
+          DOCKER_TLS_CERTDIR: ""
+        ports:
+          - 2375:2375
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v3
+      -
+        name: Create context
+        run: |
+          docker context create mycontext --docker host=tcp://127.0.0.1:2375
+      -
+        name: Check context
+        run: |
+          docker --context mycontext info
+      -
+        name: Set up Docker Buildx
+        uses: ./
+        with:
+          endpoint: mycontext
+        env:
+          DOCKER_CONTEXT: mycontext
+
+  config:
+    runs-on: ubuntu-latest
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v3
+      -
+        name: Create buildkitd conf
+        run: |
+          cat > /tmp/buildkitd.toml <<EOL
+          debug = true
+          [registry."docker.io"]
+            mirrors = ["mirror.gcr.io"]
+          EOL
+      -
+        name: Create Dockerfile
+        run: |
+          cat > ./Dockerfile <<EOL
+          FROM alpine
+          EOL
+      -
+        name: Set up Docker Buildx
+        uses: ./
+        with:
+          buildkitd-flags: --debug
+          config: /tmp/buildkitd.toml
+      -
+        name: Build
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+
+  config-inline:
+    runs-on: ubuntu-latest
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v3
+      -
+        name: Create Dockerfile
+        run: |
+          cat > ./Dockerfile <<EOL
+          FROM alpine
+          EOL
+      -
+        name: Set up Docker Buildx
+        uses: ./
+        with:
+          buildkitd-flags: --debug
+          config-inline: |
+            debug = true
+            [registry."docker.io"]
+              mirrors = ["mirror.gcr.io"]
+      -
+        name: Build
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+
+  with-qemu:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        buildx-version:
+          - latest
+          - v0.4.1
+          - ""
+        qemu-platforms:
+          - all
+          - arm64,riscv64,arm
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v3
+      -
+        name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+        with:
+          platforms: ${{ matrix.qemu-platforms }}
+      -
+        name: Set up Docker Buildx
+        id: buildx
+        uses: ./
+        with:
+          version: ${{ matrix.buildx-version }}
+      -
+        name: Inspect builder
+        run: |
+          echo "Name:      ${{ steps.buildx.outputs.name }}"
+          echo "Endpoint:  ${{ steps.buildx.outputs.endpoint }}"
+          echo "Status:    ${{ steps.buildx.outputs.status }}"
+          echo "Flags:     ${{ steps.buildx.outputs.flags }}"
+          echo "Platforms: ${{ steps.buildx.outputs.platforms }}"
+  build-ref:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        ref:
+          - master
+          - refs/tags/v0.5.1
+          - refs/pull/731/head
+          - cb185f095fd3d9444e0aa605d3789e9e05f2a1e7
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v3
+      -
+        name: Set up Docker Buildx
+        uses: ./
+        with:
+          version: https://github.com/docker/buildx.git#${{ matrix.ref }}
+      -
+        name: Check version
+        run: |
+          docker buildx version
+      -
+        name: Create Dockerfile
+        run: |
+          cat > ./Dockerfile <<EOL
+          FROM alpine
+          EOL
+      -
+        name: Build
+        uses: docker/build-push-action@master
+        with:
+          context: .
