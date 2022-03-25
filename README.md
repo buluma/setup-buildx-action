@@ -13,7 +13,7 @@ This action will create and boot a builder that can be used in the following ste
 will be used to be able to build multi-platform images and export cache thanks to the [BuildKit](https://github.com/moby/buildkit)
 container.
 
-![Screenshot](.github/setup-buildx-action.png)
+![Screenshot](https://github.com/docker/setup-buildx-action/raw/master/.github/setup-buildx-action.png)
 
 ___
 
@@ -248,7 +248,7 @@ or you can also enable debugging in the [setup-buildx action step](https://githu
 
 Logs will be available at the end of a job:
 
-![BuildKit container logs](.github/buildkit-container-logs.png)
+![BuildKit container logs](https://github.com/docker/setup-buildx-action/raw/master/.github/buildkit-container-logs.png)
 
 ## Keep up-to-date with GitHub Dependabot
 
