@@ -1,12 +1,12 @@
-[![GitHub release](https://img.shields.io/github/release/buluma/setup-buildx-action.svg?style=flat-square)](https://github.com/buluma/setup-buildx-action/releases/latest)
-[![GitHub marketplace](https://img.shields.io/badge/marketplace-buluma--setup--buildx-blue?logo=github&style=flat-square)](https://github.com/marketplace/actions/buluma-setup-buildx)
-[![CI workflow](https://img.shields.io/github/actions/workflow/status/buluma/setup-buildx-action/ci.yml?branch=master&label=ci&logo=github&style=flat-square)](https://github.com/buluma/setup-buildx-action/actions?workflow=ci)
-[![Test workflow](https://img.shields.io/github/actions/workflow/status/buluma/setup-buildx-action/test.yml?branch=master&label=test&logo=github&style=flat-square)](https://github.com/buluma/setup-buildx-action/actions?workflow=test)
-[![Codecov](https://img.shields.io/codecov/c/github/buluma/setup-buildx-action?logo=codecov&style=flat-square)](https://codecov.io/gh/buluma/setup-buildx-action)
+[![GitHub release](https://img.shields.io/github/release/docker/setup-buildx-action.svg?style=flat-square)](https://github.com/docker/setup-buildx-action/releases/latest)
+[![GitHub marketplace](https://img.shields.io/badge/marketplace-docker--setup--buildx-blue?logo=github&style=flat-square)](https://github.com/marketplace/actions/docker-setup-buildx)
+[![CI workflow](https://img.shields.io/github/actions/workflow/status/docker/setup-buildx-action/ci.yml?branch=master&label=ci&logo=github&style=flat-square)](https://github.com/docker/setup-buildx-action/actions?workflow=ci)
+[![Test workflow](https://img.shields.io/github/actions/workflow/status/docker/setup-buildx-action/test.yml?branch=master&label=test&logo=github&style=flat-square)](https://github.com/docker/setup-buildx-action/actions?workflow=test)
+[![Codecov](https://img.shields.io/codecov/c/github/docker/setup-buildx-action?logo=codecov&style=flat-square)](https://codecov.io/gh/docker/setup-buildx-action)
 
 ## About
 
-GitHub Action to set up Docker [Buildx](https://github.com/buluma/buildx).
+GitHub Action to set up Docker [Buildx](https://github.com/docker/buildx).
 
 This action will create and boot a builder that can be used in the following
 steps of your workflow if you're using Buildx or the [`build-push` action](https://github.com/docker/build-push-action/).
