@@ -1,41 +1,35 @@
 [![GitHub release](https://img.shields.io/github/release/buluma/setup-buildx-action.svg?style=flat-square)](https://github.com/buluma/setup-buildx-action/releases/latest)
-[![GitHub marketplace](https://img.shields.io/badge/marketplace-docker--setup--buildx-blue?logo=github&style=flat-square)](https://github.com/marketplace/actions/docker-setup-buildx)
-[![CI workflow](https://img.shields.io/github/workflow/status/buluma/setup-buildx-action/ci?label=ci&logo=github&style=flat-square)](https://github.com/buluma/setup-buildx-action/actions?workflow=ci)
-[![Test workflow](https://img.shields.io/github/workflow/status/buluma/setup-buildx-action/test?label=test&logo=github&style=flat-square)](https://github.com/buluma/setup-buildx-action/actions?workflow=test)
+[![GitHub marketplace](https://img.shields.io/badge/marketplace-buluma--setup--buildx-blue?logo=github&style=flat-square)](https://github.com/marketplace/actions/buluma-setup-buildx)
+[![CI workflow](https://img.shields.io/github/actions/workflow/status/buluma/setup-buildx-action/ci.yml?branch=master&label=ci&logo=github&style=flat-square)](https://github.com/buluma/setup-buildx-action/actions?workflow=ci)
+[![Test workflow](https://img.shields.io/github/actions/workflow/status/buluma/setup-buildx-action/test.yml?branch=master&label=test&logo=github&style=flat-square)](https://github.com/buluma/setup-buildx-action/actions?workflow=test)
 [![Codecov](https://img.shields.io/codecov/c/github/buluma/setup-buildx-action?logo=codecov&style=flat-square)](https://codecov.io/gh/buluma/setup-buildx-action)
 
 ## About
 
 GitHub Action to set up Docker [Buildx](https://github.com/buluma/buildx).
 
-This action will create and boot a builder that can be used in the following steps of your workflow if you're using
-[buildx](https://github.com/buluma/buildx). By default, the `docker-container` [builder driver](https://github.com/buluma/buildx/blob/master/docs/reference/buildx_create.md#driver)
-will be used to be able to build multi-platform images and export cache thanks to the [BuildKit](https://github.com/moby/buildkit)
-container.
+This action will create and boot a builder that can be used in the following
+steps of your workflow if you're using Buildx or the [`build-push` action](https://github.com/docker/build-push-action/).
+By default, the [`docker-container` driver](https://docs.docker.com/build/building/drivers/docker-container/)
+will be used to be able to build multi-platform images and export cache using
+a [BuildKit](https://github.com/moby/buildkit) container.
 
-![Screenshot](https://github.com/docker/setup-buildx-action/raw/master/.github/setup-buildx-action.png)
+![Screenshot](.github/setup-buildx-action.png)
 
 ___
 
 * [Usage](#usage)
-  * [Quick start](#quick-start)
-  * [With QEMU](#with-qemu)
-  * [Install by default](#install-by-default)
-  * [BuildKit daemon configuration](#buildkit-daemon-configuration)
-    * [Registry mirror](#registry-mirror)
-    * [Max parallelism](#max-parallelism)
+* [Configuring your builder](#configuring-your-builder)
 * [Customizing](#customizing)
   * [inputs](#inputs)
   * [outputs](#outputs)
   * [environment variables](#environment-variables)
 * [Notes](#notes)
-  * [BuildKit container logs](#buildkit-container-logs)
-* [Keep up-to-date with GitHub Dependabot](#keep-up-to-date-with-github-dependabot)
+  * [`nodes` output](#nodes-output)
+* [Contributing](#contributing)
 
 ## Usage
 
-### Quick start
-
 ```yaml
 name: ci
 
@@ -48,220 +42,117 @@ jobs:
     steps:
       -
         name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       -
-        name: Set up Docker Buildx
-        id: buildx
-        uses: buluma/setup-buildx-action@v1
-      -
-        name: Inspect builder
-        run: |
-          echo "Name:      ${{ steps.buildx.outputs.name }}"
-          echo "Endpoint:  ${{ steps.buildx.outputs.endpoint }}"
-          echo "Status:    ${{ steps.buildx.outputs.status }}"
-          echo "Flags:     ${{ steps.buildx.outputs.flags }}"
-          echo "Platforms: ${{ steps.buildx.outputs.platforms }}"
-```
-
-### With QEMU
-
-If you want support for more platforms you can use our [setup-qemu](https://github.com/buluma/setup-qemu-action) action:
-
-```yaml
-name: ci
-
-on:
-  push:
-
-jobs:
-  buildx:
-    runs-on: ubuntu-latest
-    steps:
-      -
-        name: Checkout
-        uses: actions/checkout@v2
-      -
+        # Add support for more platforms with QEMU (optional)
+        # https://github.com/docker/setup-qemu-action
         name: Set up QEMU
-        uses: buluma/setup-qemu-action@v1
+        uses: docker/setup-qemu-action@v2
       -
         name: Set up Docker Buildx
-        id: buildx
-        uses: buluma/setup-buildx-action@v1
-      -
-        name: Available platforms
-        run: echo ${{ steps.buildx.outputs.platforms }}
+        uses: docker/setup-buildx-action@v2
 ```
 
-### Install by default
+## Configuring your builder
 
-```yaml
-name: ci
-
-on:
-  push:
-
-jobs:
-  buildx:
-    runs-on: ubuntu-latest
-    steps:
-      -
-        name: Checkout
-        uses: actions/checkout@v2
-      -
-        uses: buluma/setup-buildx-action@v1
-        id: buildx
-        with:
-          install: true
-      -
-        name: Build
-        run: |
-          docker build . # will run buildx
-```
-
-### BuildKit daemon configuration
-
-You can provide a [BuildKit configuration](https://github.com/moby/buildkit/blob/master/docs/buildkitd.toml.md)
-to your builder if you're using the [`docker-container` driver](https://github.com/buluma/buildx/blob/master/docs/reference/buildx_create.md#driver)
-(default) with the `config` or `config-inline` inputs:
-
-#### Registry mirror
-
-You can configure a registry mirror using an inline block directly in your
-workflow with the `config-inline` input:
-
-```yaml
-name: ci
-
-on:
-  push:
-
-jobs:
-  buildx:
-    runs-on: ubuntu-latest
-    steps:
-      -
-        name: Set up Docker Buildx
-        uses: buluma/setup-buildx-action@v1
-        with:
-          config-inline: |
-            [registry."docker.io"]
-              mirrors = ["mirror.gcr.io"]
-```
-
-#### Max parallelism
-
-You can limit the parallelism of the BuildKit solver which is particularly
-useful for low-powered machines.
-
-You can use the `config-inline` input like the
-previous example, or you can use a dedicated BuildKit config file from your
-repo if you want with the `config` input:
-
-```toml
-# .github/buildkitd.toml
-[worker.oci]
-  max-parallelism = 4
-```
-
-```yaml
-name: ci
-
-on:
-  push:
-
-jobs:
-  buildx:
-    runs-on: ubuntu-latest
-    steps:
-      -
-        name: Set up Docker Buildx
-        uses: buluma/setup-buildx-action@v1
-        with:
-          config: .github/buildkitd.toml
-```
+* [Version pinning](https://docs.docker.com/build/ci/github-actions/configure-builder/#version-pinning): Pin to a specific Buildx or BuildKit version
+* [BuildKit container logs](https://docs.docker.com/build/ci/github-actions/configure-builder/#buildkit-container-logs): Enable BuildKit container logs for debugging purposes
+* [BuildKit Daemon configuration](https://docs.docker.com/build/ci/github-actions/configure-builder/#buildkit-daemon-configuration)
+  * [Registry mirror](https://docs.docker.com/build/ci/github-actions/configure-builder/#registry-mirror): Configure a registry mirror for your builds
+  * [Max parallelism](https://docs.docker.com/build/ci/github-actions/configure-builder/#max-parallelism): Configure the maximum parallelism for your builds
+* [Append additional nodes to the builder](https://docs.docker.com/build/ci/github-actions/configure-builder/#append-additional-nodes-to-the-builder): Create additional nodes for your builder
+* [Authentication for remote builders](https://docs.docker.com/build/ci/github-actions/configure-builder/#authentication-for-remote-builders)
+  * [SSH authentication](https://docs.docker.com/build/ci/github-actions/configure-builder/#ssh-authentication): Authenticate to a remote builder using SSH
+  * [TLS authentication](https://docs.docker.com/build/ci/github-actions/configure-builder/#tls-authentication): Authenticate to a remote builder using TLS
+* [Standalone mode](https://docs.docker.com/build/ci/github-actions/configure-builder/#standalone-mode): Use Buildx as a standalone binary (without the Docker CLI)
+* [Isolated builders](https://docs.docker.com/build/ci/github-actions/configure-builder/#isolated-builders): Create isolated builders for your builds
 
 ## Customizing
 
 ### inputs
 
-Following inputs can be used as `step.with` keys
+Following inputs can be used as `step.with` keys:
 
-| Name               | Type    | Description                       |
-|--------------------|---------|-----------------------------------|
-| `version`          | String  | [buildx](https://github.com/buluma/buildx) version. (eg. `v0.3.0`, `latest`, `https://github.com/buluma/buildx.git#master`) |
-| `driver`           | String  | Sets the [builder driver](https://github.com/buluma/buildx/blob/master/docs/reference/buildx_create.md#driver) to be used (default `docker-container`) |
-| `driver-opts`      | CSV     | List of additional [driver-specific options](https://github.com/buluma/buildx/blob/master/docs/reference/buildx_create.md#driver-opt) (eg. `image=moby/buildkit:master`) |
-| `buildkitd-flags`  | String  | [Flags for buildkitd](https://github.com/moby/buildkit/blob/master/docs/buildkitd.toml.md) daemon (since [buildx v0.3.0](https://github.com/buluma/buildx/releases/tag/v0.3.0)) |
-| `install`          | Bool    | Sets up `docker build` command as an alias to `docker buildx` (default `false`) |
-| `use`              | Bool    | Switch to this builder instance (default `true`) |
-| `endpoint`         | String  | [Optional address for docker socket](https://github.com/buluma/buildx/blob/master/docs/reference/buildx_create.md#description) or context from `docker context ls` |
-| `config`           | String  | [BuildKit config file](https://github.com/buluma/buildx/blob/master/docs/reference/buildx_create.md#config) |
-| `config-inline`    | String  | Same as `config` but inline |
-
-> `config` and `config-inline` are mutually exclusive.
-
-> `CSV` type must be a newline-delimited string
-> ```yaml
-> driver-opts: image=moby/buildkit:master
-> ```
+> `List` type is a newline-delimited string
 > ```yaml
 > driver-opts: |
 >   image=moby/buildkit:master
 >   network=host
 > ```
 
+> `CSV` type must be a comma-delimited string
+> ```yaml
+> platforms: linux/amd64,linux/arm64
+> ```
+
+| Name              | Type     | Default            | Description                                                                                                                                                                  |
+|-------------------|----------|--------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `version`         | String   |                    | [Buildx](https://github.com/docker/buildx) version. (eg. `v0.3.0`, `latest`, `https://github.com/docker/buildx.git#master`)                                                  |
+| `driver`          | String   | `docker-container` | Sets the [builder driver](https://docs.docker.com/engine/reference/commandline/buildx_create/#driver) to be used                                                             |
+| `driver-opts`     | List     |                    | List of additional [driver-specific options](https://docs.docker.com/engine/reference/commandline/buildx_create/#driver-opt) (eg. `image=moby/buildkit:master`)              |
+| `buildkitd-flags` | String   |                    | [Flags for buildkitd](https://docs.docker.com/engine/reference/commandline/buildx_create/#buildkitd-flags) daemon                                                            |
+| `install`         | Bool     | `false`            | Sets up `docker build` command as an alias to `docker buildx`                                                                                                                |
+| `use`             | Bool     | `true`             | Switch to this builder instance                                                                                                                                              |
+| `endpoint`        | String   |                    | [Optional address for docker socket](https://docs.docker.com/engine/reference/commandline/buildx_create/#description) or context from `docker context ls`                    |
+| `platforms`       | List/CSV |                    | Fixed [platforms](https://docs.docker.com/engine/reference/commandline/buildx_create/#platform) for current node. If not empty, values take priority over the detected ones. |
+| `config`¹         | String   |                    | [BuildKit config file](https://docs.docker.com/engine/reference/commandline/buildx_create/#config)                                                                           |
+| `config-inline`¹  | String   |                    | Same as `config` but inline                                                                                                                                                  |
+| `append`          | YAML     |                    | [Append additional nodes](docs/advanced/append-nodes.md) to the builder                                                                                                      |
+| `cleanup`         | Bool     | `true`             | Cleanup temp files and remove builder at the end of a job                                                                                                                    |
+
+> * ¹ `config` and `config-inline` are mutually exclusive
+
 ### outputs
 
 Following outputs are available
 
-| Name          | Type    | Description                           |
-|---------------|---------|---------------------------------------|
-| `name`        | String  | Builder name |
-| `driver`      | String  | Builder driver |
-| `endpoint`    | String  | Builder node endpoint |
-| `status`      | String  | Builder node status |
-| `flags`       | String  | Builder node flags (if applicable) |
-| `platforms`   | String  | Builder node platforms available (comma separated) |
+| Name        | Type   | Description                                     |
+|-------------|--------|-------------------------------------------------|
+| `name`      | String | Builder name                                    |
+| `driver`    | String | Builder driver                                  |
+| `platforms` | String | Builder node platforms (preferred or available) |
+| `nodes`     | JSON   | Builder [nodes metadata](#nodes-output)         |
 
 ### environment variables
 
 The following [official docker environment variables](https://docs.docker.com/engine/reference/commandline/cli/#environment-variables) are supported:
 
-| Name            | Type    | Default      | Description                                    |
-|-----------------|---------|-------------|-------------------------------------------------|
-| `DOCKER_CONFIG` | String  | `~/.docker` | The location of your client configuration files |
+| Name            | Type   | Default     | Description                                     |
+|-----------------|--------|-------------|-------------------------------------------------|
+| `DOCKER_CONFIG` | String | `~/.docker` | The location of your client configuration files |
 
 ## Notes
 
-### BuildKit container logs
+### `nodes` output
 
-To display BuildKit container logs (when `docker-container` driver is used) you have to [enable step debug logging](https://docs.github.com/en/actions/managing-workflow-runs/enabling-debug-logging#enabling-step-debug-logging)
-or you can also enable debugging in the [setup-buildx action step](https://github.com/buluma/setup-buildx-action):
-
-```yaml
-  -
-    name: Set up Docker Buildx
-    uses: buluma/setup-buildx-action@v1
-    with:
-      buildkitd-flags: --debug
+```json
+[
+  {
+     "name": "builder-3820d274-502c-4498-ae24-d4c32b3023d90",
+     "endpoint": "unix:///var/run/docker.sock",
+     "driver-opts": [
+       "network=host",
+       "image=moby/buildkit:master"
+     ],
+    "status": "running",
+    "buildkitd-flags": "--allow-insecure-entitlement security.insecure --allow-insecure-entitlement network.host",
+    "buildkit": "3fab389",
+    "platforms": "linux/amd64,linux/amd64/v2,linux/amd64/v3,linux/amd64/v4,linux/386"
+  }
+]
 ```
 
-Logs will be available at the end of a job:
+| Name              | Type   | Description                |
+|-------------------|--------|----------------------------|
+| `name`            | String | Node name                  |
+| `endpoint`        | String | Node endpoint              |
+| `driver-opts`     | List   | Options for the driver     |
+| `status`          | String | Node status                |
+| `buildkitd-flags` | String | Flags for buildkitd daemon |
+| `buildkit`        | String | BuildKit version           |
+| `platforms`       | String | Platforms available        |
 
-![BuildKit container logs](https://github.com/docker/setup-buildx-action/raw/master/.github/buildkit-container-logs.png)
+## Contributing
 
-## Keep up-to-date with GitHub Dependabot
-
-Since [Dependabot](https://docs.github.com/en/github/administering-a-repository/keeping-your-actions-up-to-date-with-github-dependabot)
-has [native GitHub Actions support](https://docs.github.com/en/github/administering-a-repository/configuration-options-for-dependency-updates#package-ecosystem),
-to enable it on your GitHub repo all you need to do is add the `.github/dependabot.yml` file:
-
-```yaml
-version: 2
-updates:
-  # Maintain dependencies for GitHub Actions
-  - package-ecosystem: "github-actions"
-    directory: "/"
-    schedule:
-      interval: "daily"
-```
+Want to contribute? Awesome! You can find information about contributing to
+this project in the [CONTRIBUTING.md](/.github/CONTRIBUTING.md)
